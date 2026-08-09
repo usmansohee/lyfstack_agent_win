@@ -29,6 +29,6 @@ coverage/
 *.log
 *.tmp
 
-## Publish output
-# publish/
-# **/publish/
+## Publish output (too large for GitHub; build locally)
+publish/
+**/publish/

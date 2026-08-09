@@ -13,13 +13,38 @@ Windows companion agent for [LyfStack](https://github.com/usmansohee). Tracks fo
 dotnet run --project src/LyfStack.Agent.Windows
 ```
 
-### Publish self-contained exe
+## Build production exe (`lyfstack_agent_win.exe`)
+
+Self-contained single-file for Windows x64 (no .NET install needed on the target PC).  
+**Not committed to git** (`publish/` is gitignored — the Release exe is ~150MB and over GitHub’s 100MB limit). Build it locally:
 
 ```powershell
-dotnet publish src/LyfStack.Agent.Windows -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o .\publish
+cd path\to\lyfstack_agent_win
+
+dotnet publish src/LyfStack.Agent.Windows `
+  -c Release `
+  -r win-x64 `
+  --self-contained true `
+  -p:PublishSingleFile=true `
+  -p:AssemblyName=lyfstack_agent_win `
+  -o .\publish
 ```
 
-Output: `publish\LyfStack.Agent.Windows.exe`
+Output:
+
+```
+publish\lyfstack_agent_win.exe
+```
+
+Optional: also copy native deps from `publish\` next to the exe if Windows asks for missing DLLs (SQLite / WPF natives are usually included with single-file).
+
+Run it:
+
+```powershell
+.\publish\lyfstack_agent_win.exe
+# or tray-only:
+.\publish\lyfstack_agent_win.exe --tray
+```
 
 ## How sync works (two directions)
 
@@ -280,5 +305,5 @@ dotnet test LyfStack.Agent.Windows.sln
 LyfStack.Agent.Windows.sln
 src/LyfStack.Agent.Windows/
 tests/LyfStack.Agent.Windows.Tests/
-publish/                         # local Release output (not committed)
+publish/   # local prod build only (gitignored) → lyfstack_agent_win.exe
 ```
