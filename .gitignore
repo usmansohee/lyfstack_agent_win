@@ -1,0 +1,30 @@
+## Build
+**/bin/
+**/obj/
+**/out/
+*.user
+*.dll
+*.exe
+*.pdb
+*.cache
+
+## IDE / OS
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+## Test / coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## Logs / local
+*.log
+*.tmp
