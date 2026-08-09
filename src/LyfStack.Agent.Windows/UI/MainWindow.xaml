@@ -522,8 +522,20 @@
                   <ComboBoxItem Tag="30" Content="Every 30 minutes"/>
                 </ComboBox>
                 <TextBlock x:Name="NextSyncText" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,16" Text="Next sync: —"/>
-                <TextBlock Style="{StaticResource SettingsLabel}" Text="SYNC ENDPOINT"/>
+                <TextBlock Style="{StaticResource SettingsLabel}" Text="SYNC ENDPOINT (HTTPS data)"/>
                 <TextBox x:Name="EndpointBox" Padding="10,8" FontSize="13" BorderBrush="#CBD5E1" BorderThickness="1"/>
+                <TextBlock Style="{StaticResource SettingsLabel}" Margin="0,14,0,0" Text="DEVICE CONNECTION (WebSocket control)"/>
+                <TextBlock Foreground="#94A3B8" FontSize="11" Margin="0,0,0,6" TextWrapping="Wrap"
+                           Text="Outbound link so lyfstack.net Sync Now can reach this PC. No public PC URL needed."/>
+                <DockPanel Margin="0,0,0,8">
+                  <CheckBox x:Name="DeviceConnectionToggle" Content="Enabled" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="DeviceConnectionStatusText" DockPanel.Dock="Right" HorizontalAlignment="Right"
+                             Foreground="#64748B" FontSize="12" VerticalAlignment="Center" Text="Off"/>
+                </DockPanel>
+                <TextBox x:Name="DeviceConnectionUrlBox" Padding="10,8" FontSize="13" BorderBrush="#CBD5E1" BorderThickness="1"
+                         Margin="0,0,0,8" ToolTip="wss://api.lyfstack.app/device-connection"/>
+                <TextBox x:Name="DeviceConnectionTokenBox" Padding="10,8" FontSize="13" BorderBrush="#CBD5E1" BorderThickness="1"
+                         Margin="0,0,0,0" ToolTip="Optional auth token"/>
                 <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
                   <Button Content="Save settings" Style="{StaticResource PrimaryButton}" Click="SaveSettings_OnClick"/>
                   <Button Content="Sync now" Style="{StaticResource GhostButton}" Margin="10,0,0,0" Click="SyncButton_OnClick"/>

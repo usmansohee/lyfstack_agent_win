@@ -141,12 +141,14 @@ internal static class Program
 
             var syncClient = new HttpActivitySyncClient(settings.SyncEndpointUrl);
             var sync = new SyncService(store, syncClient, settings);
+            var deviceConnection = new DeviceConnectionService(settings);
 
             using var host = new TrayAppHost(
                 options,
                 store,
                 tracking,
                 sync,
+                deviceConnection,
                 cts,
                 processControl.StopHandle,
                 startHidden);

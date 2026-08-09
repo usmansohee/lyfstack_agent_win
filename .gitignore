@@ -30,5 +30,5 @@ coverage/
 *.tmp
 
 ## Publish output
-publish/
-**/publish/
+# publish/
+# **/publish/

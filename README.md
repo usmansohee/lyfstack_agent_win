@@ -73,17 +73,46 @@ POST /api/v1/device-activity/sync?range=all
 POST /api/v1/device-activity/sync?range=custom&from=2026-01-01&to=2026-01-31
 ```
 
-### Website “Sync now”
+### Website “Sync now” (phone / other device)
 
-Recommended flow:
+The Windows `.exe` has **no public URL**. Your PC is behind NAT.
 
-1. User clicks **Sync now** on LyfStack web (optionally with the same `range` query).
-2. Website calls **your backend** (not the Windows PC), e.g. marks a sync request or simply refreshes stored activity.
-3. The Windows agent either:
-   - already auto-synced / user synced from the tray app, or
-   - (future) polls `GET /api/v1/device-activity/sync-requests` and then `POST`s with the requested `range`.
+Correct flow:
 
-Until pull-requests exist, treat website Sync now as **refresh from DB** after the agent has pushed.
+```
+Phone → lyfstack.net → LyfStack API ──WebSocket──→ Windows Agent (outbound)
+                              ↑                         │
+                              └──── HTTPS POST sync ────┘
+```
+
+1. Agent opens outbound `wss://api.lyfstack.app/device-connection` (Settings → Device connection).
+2. Website **Sync Now** tells the **server** to send `{ "type": "SYNC_NOW", "range": "since_last" }` on that socket.
+3. Agent receives it, then `POST`s activity to `/api/v1/device-activity/sync`.
+
+Enable in agent Settings: **Device connection** → Enabled + your `wss://…` URL.
+
+#### WebSocket control protocol
+
+Agent → server on connect:
+
+```json
+{ "type": "HELLO", "deviceId": "...", "device": "PC-NAME", "platform": "windows", "agentVersion": "1.0.0" }
+```
+
+Server → agent:
+
+```json
+{ "type": "SYNC_NOW", "range": "since_last", "requestId": "optional" }
+{ "type": "SYNC_NOW", "range": "week" }
+{ "type": "SYNC_NOW", "range": "custom", "from": "2026-01-01", "to": "2026-01-31" }
+{ "type": "PING" }
+{ "type": "PAUSE" }
+{ "type": "RESUME" }
+```
+
+Agent → server replies: `PONG`, `SYNC_RESULT`, `STATUS`, `ERROR`.
+
+Agent auto-reconnects with exponential backoff if the socket drops.
 
 ### Request body (agent → LyfStack)
 

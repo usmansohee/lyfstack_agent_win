@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private readonly SqliteSessionStore _store;
     private readonly ActivityTrackingService _trackingService;
     private readonly SyncService _syncService;
+    private readonly DeviceConnectionService _deviceConnection;
     private readonly ObservableCollection<SessionRow> _rows = new();
     private readonly ObservableCollection<TopAppRow> _topApps = new();
     private readonly ObservableCollection<CategoryStatRow> _categoryStats = new();
@@ -37,13 +38,15 @@ public partial class MainWindow : Window
     public MainWindow(
         SqliteSessionStore store,
         ActivityTrackingService trackingService,
-        SyncService syncService)
+        SyncService syncService,
+        DeviceConnectionService deviceConnection)
     {
         InitializeComponent();
 
         _store = store;
         _trackingService = trackingService;
         _syncService = syncService;
+        _deviceConnection = deviceConnection;
 
         HistoryGrid.ItemsSource = _rows;
         TopAppsList.ItemsSource = _topApps;
@@ -278,6 +281,11 @@ public partial class MainWindow : Window
             SyncEndpointUrl = string.IsNullOrWhiteSpace(EndpointBox.Text)
                 ? new AgentSettings().SyncEndpointUrl
                 : EndpointBox.Text.Trim(),
+            DeviceConnectionEnabled = DeviceConnectionToggle.IsChecked == true,
+            DeviceConnectionUrl = string.IsNullOrWhiteSpace(DeviceConnectionUrlBox.Text)
+                ? new AgentSettings().DeviceConnectionUrl
+                : DeviceConnectionUrlBox.Text.Trim(),
+            DeviceConnectionToken = DeviceConnectionTokenBox.Text?.Trim() ?? "",
             IgnoredProcesses = IgnoreListBox.Text
                 .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -287,7 +295,9 @@ public partial class MainWindow : Window
 
         AgentSettingsStore.Save(settings);
         _syncService.ApplySettings(settings);
+        _deviceConnection.ApplySettings(settings);
         SettingsHint.Text = "Settings saved.";
+        SetDeviceConnectionStatus(_deviceConnection.Status);
         RefreshUi();
     }
 
@@ -311,6 +321,10 @@ public partial class MainWindow : Window
         AgentSettings settings = _syncService.Settings;
         AutoSyncToggle.IsChecked = settings.AutoSyncEnabled;
         EndpointBox.Text = settings.SyncEndpointUrl;
+        DeviceConnectionToggle.IsChecked = settings.DeviceConnectionEnabled;
+        DeviceConnectionUrlBox.Text = settings.DeviceConnectionUrl;
+        DeviceConnectionTokenBox.Text = settings.DeviceConnectionToken;
+        SetDeviceConnectionStatus(_deviceConnection.Status);
         IgnoreListBox.Text = string.Join(Environment.NewLine, settings.IgnoredProcesses);
 
         _categoryRuleLines.Clear();
@@ -500,6 +514,16 @@ public partial class MainWindow : Window
         }
 
         RefreshStartupUi();
+    }
+
+    public void SetDeviceConnectionStatus(string status)
+    {
+        DeviceConnectionStatusText.Text = status;
+        DeviceConnectionStatusText.Foreground = status.Equals("Online", StringComparison.OrdinalIgnoreCase)
+            ? Green
+            : status.Equals("Off", StringComparison.OrdinalIgnoreCase)
+                ? Gray
+                : Amber;
     }
 
     private void ApplyDeviceInfo(DeviceInfoSnapshot device, LastSyncInfo? last)

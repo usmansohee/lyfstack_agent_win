@@ -19,6 +19,7 @@ internal sealed class TrayAppHost : IDisposable
     private readonly SqliteSessionStore _store;
     private readonly ActivityTrackingService _tracking;
     private readonly SyncService _sync;
+    private readonly DeviceConnectionService _deviceConnection;
     private readonly bool _startHidden;
 
     private System.Windows.Forms.NotifyIcon? _notifyIcon;
@@ -33,6 +34,7 @@ internal sealed class TrayAppHost : IDisposable
         SqliteSessionStore store,
         ActivityTrackingService tracking,
         SyncService sync,
+        DeviceConnectionService deviceConnection,
         CancellationTokenSource cts,
         WaitHandle stopSignal,
         bool startHidden)
@@ -41,6 +43,7 @@ internal sealed class TrayAppHost : IDisposable
         _store = store;
         _tracking = tracking;
         _sync = sync;
+        _deviceConnection = deviceConnection;
         _cts = cts;
         _stopSignal = stopSignal;
         _startHidden = startHidden;
@@ -72,7 +75,7 @@ internal sealed class TrayAppHost : IDisposable
         _notifyIcon.ContextMenuStrip = menu;
         _notifyIcon.DoubleClick += (_, _) => ShowWindow();
 
-        _window = new MainWindow(_store, _tracking, _sync);
+        _window = new MainWindow(_store, _tracking, _sync, _deviceConnection);
         _window.HideRequested += () =>
         {
             _notifyIcon.ShowBalloonTip(
@@ -82,7 +85,21 @@ internal sealed class TrayAppHost : IDisposable
                 System.Windows.Forms.ToolTipIcon.Info);
         };
 
+        _deviceConnection.CommandReceived += cmd =>
+        {
+            _ = _app?.Dispatcher.InvokeAsync(async () => await HandleDeviceCommandAsync(cmd));
+        };
+        _deviceConnection.StatusChanged += status =>
+        {
+            _app?.Dispatcher.Invoke(() =>
+            {
+                _window?.SetDeviceConnectionStatus(status);
+                UpdateTrayTooltip();
+            });
+        };
+
         _sync.StartPeriodicSync();
+        _deviceConnection.Start();
         _sync.SyncCompleted += result =>
         {
             if (!_startHidden && _window?.IsVisible == true)
@@ -188,8 +205,79 @@ internal sealed class TrayAppHost : IDisposable
             }
         }
 
-        string tip = $"LyfStack · {Trim(app, 18)} · today {Format(todayActive)}";
+        string tip = $"LyfStack · {Trim(app, 14)} · {Trim(_deviceConnection.Status, 10)} · today {Format(todayActive)}";
         _notifyIcon.Text = tip.Length <= 63 ? tip : tip[..63];
+    }
+
+    private async Task HandleDeviceCommandAsync(DeviceCommandMessage cmd)
+    {
+        try
+        {
+            switch (cmd.Type)
+            {
+                case "SYNC_NOW":
+                {
+                    SyncRangeQuery range = SyncRangeQuery.Parse(cmd.Range, cmd.From, cmd.To);
+                    SyncResult result = await _sync.SyncNowAsync(range, "remote");
+                    await _deviceConnection.SendAsync(new
+                    {
+                        type = "SYNC_RESULT",
+                        requestId = cmd.RequestId,
+                        success = result.Success,
+                        message = result.Message,
+                        sessionCount = result.SessionCount,
+                        range = range.ToRangeParam()
+                    });
+                    _notifyIcon?.ShowBalloonTip(
+                        2200,
+                        "LyfStack Sync",
+                        result.Message,
+                        result.Success
+                            ? System.Windows.Forms.ToolTipIcon.Info
+                            : System.Windows.Forms.ToolTipIcon.Error);
+                    break;
+                }
+                case "PAUSE":
+                    _tracking.IsPaused = true;
+                    if (_pauseMenuItem is not null)
+                    {
+                        _pauseMenuItem.Text = "Resume tracking";
+                    }
+
+                    UpdateTrayTooltip();
+                    await _deviceConnection.SendAsync(new
+                    {
+                        type = "STATUS",
+                        requestId = cmd.RequestId,
+                        trackingPaused = true
+                    });
+                    break;
+                case "RESUME":
+                    _tracking.IsPaused = false;
+                    if (_pauseMenuItem is not null)
+                    {
+                        _pauseMenuItem.Text = "Pause tracking";
+                    }
+
+                    UpdateTrayTooltip();
+                    await _deviceConnection.SendAsync(new
+                    {
+                        type = "STATUS",
+                        requestId = cmd.RequestId,
+                        trackingPaused = false
+                    });
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            await _deviceConnection.SendAsync(new
+            {
+                type = "ERROR",
+                requestId = cmd.RequestId,
+                message = ex.Message
+            });
+        }
     }
 
     private void ShowWindow()
@@ -232,6 +320,7 @@ internal sealed class TrayAppHost : IDisposable
         _cts.Cancel();
         _trayTipTimer?.Stop();
         _ = _sync.DisposeAsync();
+        _ = _deviceConnection.DisposeAsync();
         if (_notifyIcon is not null)
         {
             _notifyIcon.Visible = false;
