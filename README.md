@@ -46,6 +46,18 @@ Run it:
 .\publish\lyfstack_agent_win.exe --tray
 ```
 
+> **Note:** This publish output is a portable/runnable exe, **not** a Windows installer (`Setup.exe`).
+
+### TODO — Inno Setup installer (later)
+
+- [ ] Add an **Inno Setup** script to wrap `publish\` into an installable `LyfStack.Agent.Windows.Setup.exe`
+- [ ] Install to something like `%LocalAppData%\LyfStack\Agent` (or Program Files)
+- [ ] Start Menu shortcut + optional “Start with Windows”
+- [ ] Uninstaller entry in Apps & features
+- [ ] Document build: `publish` → compile `.iss` → ship `Setup.exe`
+
+Until then, distribute/run `lyfstack_agent_win.exe` directly.
+
 ## How sync works (two directions)
 
 ### A) Sync from the `.exe` (simple — works today)
