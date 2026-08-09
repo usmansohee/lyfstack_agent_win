@@ -1,4 +1,5 @@
 using LyfStack.Agent.Windows.Models;
+using LyfStack.Agent.Windows.Sync;
 using Microsoft.Data.Sqlite;
 
 namespace LyfStack.Agent.Windows.Persistence;
@@ -157,6 +158,56 @@ public sealed class SqliteSessionStore : IDisposable
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$limit", limit);
+
+        var sessions = new List<UsageSession>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            sessions.Add(ReadSession(reader));
+        }
+
+        return sessions;
+    }
+
+    /// <summary>
+    /// Sessions for a sync range (pending-only, date window, or all).
+    /// </summary>
+    public IReadOnlyList<UsageSession> GetSessionsForSync(ResolvedSyncWindow window, int limit = 5000)
+    {
+        if (window.PendingOnly)
+        {
+            return GetPendingSync(Math.Min(limit, 5000));
+        }
+
+        EnsureInitialized();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+
+        var sql = new System.Text.StringBuilder(
+            """
+            SELECT
+                id, application_name, process_name, process_id,
+                started_at, ended_at, active_duration_ms, idle_duration_ms, last_state,
+                executable_path
+            FROM usage_sessions
+            WHERE 1 = 1
+            """);
+
+        if (window.From is DateTimeOffset from)
+        {
+            sql.Append(" AND started_at >= $from");
+            command.Parameters.AddWithValue("$from", ToIso(from));
+        }
+
+        if (window.To is DateTimeOffset to)
+        {
+            sql.Append(" AND started_at <= $to");
+            command.Parameters.AddWithValue("$to", ToIso(to));
+        }
+
+        sql.Append(" ORDER BY started_at DESC LIMIT $limit;");
+        command.Parameters.AddWithValue("$limit", Math.Max(1, limit));
+        command.CommandText = sql.ToString();
 
         var sessions = new List<UsageSession>();
         using var reader = command.ExecuteReader();

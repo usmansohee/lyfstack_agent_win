@@ -44,19 +44,27 @@ public sealed class SyncService : IAsyncDisposable
         RestartPeriodicSync();
     }
 
-    public async Task<SyncResult> SyncNowAsync(string trigger = "manual", CancellationToken cancellationToken = default)
+    public Task<SyncResult> SyncNowAsync(string trigger = "manual", CancellationToken cancellationToken = default) =>
+        SyncNowAsync(SyncRangeQuery.SinceLast, trigger, cancellationToken);
+
+    public async Task<SyncResult> SyncNowAsync(
+        SyncRangeQuery range,
+        string trigger = "manual",
+        CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            // Incremental: only new/changed aggregated sessions.
-            IReadOnlyList<UsageSession> sessions = _store.GetPendingSync(500);
+            ResolvedSyncWindow window = range.Resolve();
+            IReadOnlyList<UsageSession> sessions = _store.GetSessionsForSync(window);
             if (sessions.Count == 0)
             {
                 var empty = new SyncResult
                 {
                     Success = true,
-                    Message = "Nothing new to sync",
+                    Message = window.PendingOnly
+                        ? "Nothing new to sync"
+                        : $"No sessions in range ({range.ToRangeParam()})",
                     SessionCount = 0,
                     SyncedAt = DateTimeOffset.UtcNow,
                     Trigger = trigger
@@ -69,14 +77,14 @@ public sealed class SyncService : IAsyncDisposable
                     Success = true,
                     Message = empty.Message,
                     Trigger = trigger,
-                    Endpoint = _client.EndpointUrl
+                    Endpoint = SyncPayloadFactory.BuildRequestUrl(_client.EndpointUrl, range)
                 });
 
                 SyncCompleted?.Invoke(empty);
                 return empty;
             }
 
-            SyncResult result = await _client.PushSessionsAsync(sessions, trigger, cancellationToken);
+            SyncResult result = await _client.PushSessionsAsync(sessions, trigger, range, cancellationToken);
 
             if (result.Success)
             {
@@ -92,7 +100,7 @@ public sealed class SyncService : IAsyncDisposable
                 Success = result.Success,
                 Message = result.Message,
                 Trigger = result.Trigger,
-                Endpoint = _client.EndpointUrl
+                Endpoint = SyncPayloadFactory.BuildRequestUrl(_client.EndpointUrl, range)
             });
 
             SyncCompleted?.Invoke(result);
@@ -139,7 +147,7 @@ public sealed class SyncService : IAsyncDisposable
 
             try
             {
-                SyncResult result = await SyncNowAsync("automatic", cancellationToken);
+                SyncResult result = await SyncNowAsync(SyncRangeQuery.SinceLast, "automatic", cancellationToken);
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] AUTO SYNC      {result.Message}");
             }
             catch (OperationCanceledException)

@@ -285,11 +285,20 @@
 
           <DockPanel Grid.Row="2" Margin="0,10,0,0">
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+              <ComboBox x:Name="SyncRangeCombo" Width="130" Margin="0,0,10,0" VerticalAlignment="Center"
+                        ToolTip="What to sync to LyfStack">
+                <ComboBoxItem Tag="since_last" Content="Since last" IsSelected="True"/>
+                <ComboBoxItem Tag="today" Content="Today"/>
+                <ComboBoxItem Tag="week" Content="This week"/>
+                <ComboBoxItem Tag="month" Content="This month"/>
+                <ComboBoxItem Tag="year" Content="This year"/>
+                <ComboBoxItem Tag="all" Content="All time"/>
+              </ComboBox>
               <Button x:Name="PauseButton" Content="Pause tracking" Style="{StaticResource GhostButton}" Margin="0,0,10,0" Click="PauseButton_OnClick"/>
               <Button x:Name="SyncButton" Content="Sync now" Style="{StaticResource PrimaryButton}" Click="SyncButton_OnClick"/>
             </StackPanel>
             <TextBlock x:Name="FooterHint" VerticalAlignment="Center" Foreground="#64748B" FontSize="12"
-                       Text="History lives in its own tab. Sync uploads only new/changed sessions."/>
+                       Text="History lives in its own tab. Sync uploads sessions for the selected range."/>
           </DockPanel>
         </Grid>
       </TabItem>

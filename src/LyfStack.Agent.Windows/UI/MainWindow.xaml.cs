@@ -99,7 +99,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        SyncRangeCombo(HistoryRangeCombo, HistoryRangeCombo2);
+        MirrorHistoryRangeSelection(HistoryRangeCombo, HistoryRangeCombo2);
         RefreshUi();
     }
 
@@ -110,11 +110,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        SyncRangeCombo(HistoryRangeCombo2, HistoryRangeCombo);
+        MirrorHistoryRangeSelection(HistoryRangeCombo2, HistoryRangeCombo);
         RefreshUi();
     }
 
-    private void SyncRangeCombo(System.Windows.Controls.ComboBox source, System.Windows.Controls.ComboBox target)
+    private void MirrorHistoryRangeSelection(System.Windows.Controls.ComboBox source, System.Windows.Controls.ComboBox target)
     {
         _syncingRangeCombos = true;
         try
@@ -150,17 +150,19 @@ public partial class MainWindow : Window
         SyncButton.IsEnabled = false;
         SyncDot.Fill = Amber;
         SyncStatusText.Text = "Syncing…";
-        FooterHint.Text = "Uploading new/changed sessions…";
+        FooterHint.Text = "Uploading sessions…";
         SettingsHint.Text = "Syncing…";
 
         try
         {
-            SyncResult result = await _syncService.SyncNowAsync("manual");
+            string rangeTag = (SyncRangeCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "since_last";
+            SyncRangeQuery range = SyncRangeQuery.Parse(rangeTag);
+            SyncResult result = await _syncService.SyncNowAsync(range, "manual");
             ApplySyncResult(result);
             FooterHint.Text = result.Success
                 ? result.SessionCount == 0
-                    ? "Nothing new to sync."
-                    : $"Synced {result.SessionCount} new/changed session(s)."
+                    ? $"Nothing to sync ({range.ToRangeParam()})."
+                    : $"Synced {result.SessionCount} session(s) [{range.ToRangeParam()}]."
                 : result.Message;
             SettingsHint.Text = result.Message;
         }

@@ -29,14 +29,17 @@ public sealed class HttpActivitySyncClient : IActivitySyncClient
     public async Task<SyncResult> PushSessionsAsync(
         IReadOnlyList<UsageSession> sessions,
         string trigger,
+        SyncRangeQuery? range = null,
         CancellationToken cancellationToken = default)
     {
-        object payload = SyncPayloadFactory.Create(sessions);
+        SyncRangeQuery effectiveRange = range ?? SyncRangeQuery.SinceLast;
+        object payload = SyncPayloadFactory.Create(sessions, effectiveRange);
+        string requestUrl = SyncPayloadFactory.BuildRequestUrl(EndpointUrl, effectiveRange);
 
         try
         {
             using HttpResponseMessage response = await _httpClient.PostAsJsonAsync(
-                EndpointUrl,
+                requestUrl,
                 payload,
                 JsonOptions,
                 cancellationToken);
@@ -44,7 +47,7 @@ public sealed class HttpActivitySyncClient : IActivitySyncClient
             string body = await response.Content.ReadAsStringAsync(cancellationToken);
             bool success = response.IsSuccessStatusCode;
             string message = success
-                ? $"Synced {sessions.Count} sessions via {trigger} ({(int)response.StatusCode})"
+                ? $"Synced {sessions.Count} sessions via {trigger} ({(int)response.StatusCode}) [{effectiveRange.ToRangeParam()}]"
                 : $"Sync failed ({(int)response.StatusCode}): {Trim(body, 180)}";
 
             return new SyncResult
@@ -90,26 +93,10 @@ public sealed class HttpActivitySyncClient : IActivitySyncClient
 
     public static void SaveLastSync(LastSyncInfo info)
     {
-        try
-        {
-            AgentPaths.EnsureDataDirectory();
-            string json = JsonSerializer.Serialize(info, JsonOptions);
-            File.WriteAllText(AgentPaths.LastSyncPath, json);
-        }
-        catch
-        {
-            // Best-effort local cache.
-        }
+        AgentPaths.EnsureDataDirectory();
+        File.WriteAllText(AgentPaths.LastSyncPath, JsonSerializer.Serialize(info, JsonOptions));
     }
 
-    private static string Trim(string value, int max)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        string compact = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
-        return compact.Length <= max ? compact : compact[..max] + "...";
-    }
+    private static string Trim(string value, int max) =>
+        value.Length <= max ? value : value[..max] + "…";
 }
